@@ -1,126 +1,90 @@
 # Airplane Landing Scheduling Project
 
 ## Overview
-
-This repository implements scheduling of airplane landings using metaheuristic methods (Simulated Annealing, Genetic Algorithm, and Variable Neighborhood Search). It includes:
-
-- **Source code** in `src/`:
-  - `landing_scheduler.py` — penalty calculation and separation checks
-  - `metaheuristics.py` — implementations of SA, GA, and VNS
-  - `utils.py` — data loading and schedule plotting utilities
-- **Jupyter Notebook** `project_delta.ipynb` — interactive workflow:
-  1. Data loading
-  2. Baseline heuristic
-  3. SA, GA, and VNS runs
-  4. Comparison of results
-  5. (Optional) convergence plots
-- **Data folder** `data/landings.csv` — input data file with columns:
-  - `earliest`, `target`, `latest`, `earliness_penalty`, `lateness_penalty`
-- **`main.py`** — script to run all experiments and save outputs
-- **`requirements.txt`** — Python dependencies
-- **README.md** — this file
-
----
-
-## Project Structure
+This repository schedules airplane landings using three metaheuristics (Simulated Annealing, Genetic Algorithm, Variable Neighborhood Search) and visualises results with a **Streamlit** dashboard.
 
 ```
 project_delta/
-├── data/
-│   └── landings.csv
-├── results/            # output plots and summary CSV
-├── src/
+├── data/landings.csv          # input data
+├── results/                   # generated plots & summary CSV
+├── src/                       # Python package
 │   ├── __init__.py
-│   ├── landing_scheduler.py
-│   ├── metaheuristics.py
-│   └── utils.py
-├── project_delta.ipynb
-├── main.py
-├── requirements.txt
-└── README.md
+│   ├── landing_scheduler.py   # penalty + separation checks
+│   ├── metaheuristics.py      # SA, GA, VNS classes
+│   └── utils.py               # data loading + plotting helpers
+├── main.py                    # command‑line driver (runs algorithms + optional dashboard)
+├── app.py                     # Streamlit dashboard
+├── project_delta.ipynb        # exploratory notebook
+├── requirements.txt           # Python deps (pip/conda)
+└── README.md                  # this file
 ```
 
----
-
-## Setup with Conda
-
-1. **Create and activate** a Conda environment:
-   ```bash
-   conda create -n landing-sched python=3.9
-   conda activate landing-sched
-   ```
-
-2. **Install core packages via Conda**:
-   ```bash
-   conda install numpy pandas matplotlib notebook tqdm
-   ```
-
-3. **Install remaining dependencies** from `requirements.txt`:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Verify** installation:
-   ```bash
-   conda list
-   ```
-
----
-
-## Usage
-
-### 1. Jupyter Notebook
-
-Launch Jupyter and open the notebook:
+## Quick start
+### 1 · Set up the environment (conda)
 ```bash
-jupyter notebook project_delta.ipynb
+conda create -n landing-sched python=3.9
+conda activate landing-sched
+# core libs via conda for faster installs
+conda install numpy pandas matplotlib notebook tqdm
+# remainder via pip
+pip install -r requirements.txt
 ```
 
-Run each cell sequentially. The notebook will:
-- Load and display the data
-- Compute and plot a baseline schedule
-- Execute SA, GA, and VNS, plotting each result
-- Show a comparison table of penalties
-- (Optionally) plot convergence curves
-
-### 2. Command-Line Script
-
-Run all experiments with:
+### 2 · Run all algorithms
 ```bash
 python main.py --data data/landings.csv --output results
 ```
-This will:
-- Compute baseline, SA, GA, and VNS schedules
-- Save each schedule plot in `results/`
-- Generate `results_summary.csv` with method vs. penalty
+*Plots* (`baseline/sa/ga/vns` PNG) and `results_summary.csv` are saved in `results/`.
 
----
-
-## Customization
-
-- **Algorithm parameters**: adjust defaults in `src/metaheuristics.py` or pass arguments when instantiating in `main.py`.
-- **Separation time**: modify the default `4.0` in `src/landing_scheduler.py`.
-- **Convergence logging**: extend classes to record history arrays for plotting.
-
----
-
-## Exporting the Report
-
-To generate a PDF from the notebook:
+### 3 · Launch the dashboard
+Either separately:
 ```bash
-jupyter nbconvert --to pdf project_delta.ipynb
+streamlit run app.py --server.headless true
 ```
-Or Markdown:
+Or automatically after the experiments:
 ```bash
-jupyter nbconvert --to markdown project_delta.ipynb
+python main.py --launch-app
+```
+The script starts Streamlit in headless mode and opens **http://localhost:8501**; press **Ctrl‑C** in the terminal to stop.
+
+---
+## Streamlit Dashboard (`app.py`)
+* Shows the summary table (Method × Penalty).
+* Displays each schedule plot side‑by‑side.
+* Sidebar **Refresh Results** button reloads the CSV/plots after re‑running `main.py`.
+
+Column‑name normalisation means the dashboard accepts either lowercase or title‑case headers in `results_summary.csv`.
+
+---
+## Algorithm notes
+* **Baseline** – greedy sequence sorted by target time, shifted to satisfy the 4‑unit separation.
+* **SA / VNS** – simple permutation search using target times as decoding; feel free to extend with repair/shift decoding for tighter penalties.
+* **GA** – skips plotting if no feasible individual is found (penalty = ∞).
+
+---
+## requirements.txt (pip)
+```
+numpy>=1.21
+pandas>=1.3
+matplotlib>=3.4
+tqdm>=4.62
+streamlit>=1.32
+```
+(*If you prefer, install `numpy`/`pandas`/`matplotlib` with conda first, then `pip install streamlit tqdm`.*)
+
+---
+## Usage reference
+```bash
+python main.py -h
+```
+```
+--data         path to CSV  (default: data/landings.csv)
+--output       results dir  (default: results)
+--launch-app   start Streamlit after computations
 ```
 
 ---
-
 ## License
+MIT
 
-MIT License
-
----
-
-*Happy scheduling!*
+*Happy scheduling & visualising!*

@@ -7,3 +7,4 @@ streamlit>=0.88
 # Optional metaheuristic libraries
 deap     # for more GA utilities
 simanneal>=0.5  # standalone SA implementation
+

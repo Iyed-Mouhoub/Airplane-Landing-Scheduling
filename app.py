@@ -1,76 +1,75 @@
-# app.py
 import os
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
 # Constants
-RESULTS_DIR = 'results'
-SUMMARY_CSV = os.path.join(RESULTS_DIR, 'results_summary.csv')
-PLOTS = {
-    'Baseline': 'baseline_schedule.png',
-    'Simulated Annealing': 'sa_schedule.png',
-    'Genetic Algorithm': 'ga_schedule.png',
-    'Variable Neighborhood Search': 'vns_schedule.png'
-}
+data_dir = "data"
+SUMMARY_CSV = os.path.join("results", "results_summary.csv")
+PLOTS_DIR = "results"
 
-st.set_page_config(page_title='Airplane Landing Scheduling', layout='wide')
-
-st.title('🛬 Airplane Landing Scheduling Dashboard')
-
+# Title & description
+st.set_page_config(layout="wide")
+st.title("✈️ Airplane Landing Scheduling Dashboard")
 st.markdown(
     """
-    This app displays the results of different metaheuristic algorithms applied to the airplane landing scheduling problem.
+    This app displays the results of different metaheuristic algorithms 
+    applied to the airplane landing scheduling problem.
 
-    - **Baseline** – Feasible greedy schedule
+    - **Baseline**: Feasible greedy schedule
     - **Simulated Annealing (SA)**
     - **Genetic Algorithm (GA)**
     - **Variable Neighborhood Search (VNS)**
     """
 )
 
-# ---------------------------------------------------------------------
-# Helper: load summary CSV and standardise column names               
-# ---------------------------------------------------------------------
+# Controls
+with st.sidebar:
+    if st.button("Refresh Results", key="refresh"):
+        st.experimental_rerun()
+
+# Summary loader (re-reading on each run)
 @st.cache_data
 def load_summary(path: str) -> pd.DataFrame:
+    """
+    Load the summary CSV. Cached, but invalidated automatically when the file changes.
+    """
     if not os.path.exists(path):
         return pd.DataFrame()
     df = pd.read_csv(path)
-    # Normalise column name capitalisation so either "method" or "Method" works
+    # normalize column names
     df.columns = [c.strip().title() for c in df.columns]
     return df
 
+# Load and display summary
 summary_df = load_summary(SUMMARY_CSV)
-
-# ---------------------------------------------------------------------
-# Display area                                                         
-# ---------------------------------------------------------------------
-expected_cols = {'Method', 'Penalty'}
-
 if summary_df.empty:
-    st.warning('No results found. Run `main.py` first to generate results.')
-elif not expected_cols.issubset(summary_df.columns):
-    st.error(f'`results_summary.csv` must contain columns: {expected_cols}. Found {list(summary_df.columns)}')
+    st.warning("No results found. Run `main.py` first to generate results.")
 else:
-    # Results table ---------------------------------------------------
-    st.subheader('Results Summary')
+    st.subheader("Results Summary")
     st.dataframe(summary_df.set_index('Method'))
 
-    # Schedule plots --------------------------------------------------
-    st.subheader('Schedules')
+    # Display schedule plots
+    st.subheader("Schedules")
     cols = st.columns(2)
-    for idx, row in summary_df.iterrows():
+
+    # map method names to generated plot filenames
+    filename_map = {
+        'Baseline': 'baseline_schedule.png',
+        'Simulated Annealing': 'sa_schedule.png',
+        'Genetic Algorithm': 'ga_schedule.png',
+        'Variable Neighborhood Search': 'vns_schedule.png'
+    }
+
+    for idx, (_, row) in enumerate(summary_df.iterrows()):
         method = row['Method']
+        plot_file = filename_map.get(method, '')
+        plot_path = os.path.join(PLOTS_DIR, plot_file)
         col = cols[idx % 2]
-        plot_path = os.path.join(RESULTS_DIR, PLOTS.get(method, ''))
-        if os.path.exists(plot_path):
-            col.markdown(f'**{method}**')
+        col.markdown(f"**{method}**")
+        if plot_file and os.path.exists(plot_path):
             col.image(plot_path, use_container_width=True)
-
         else:
-            col.markdown(f'**{method}** – plot not found')
+            col.info(f"Plot for {method} not found.")
 
-# Sidebar controls ----------------------------------------------------
-st.sidebar.title('Controls')
-if st.sidebar.button('Refresh Results', key='refresh'):
-    st.experimental_rerun()
+    # Optionally: add convergence curves here
+    # ...

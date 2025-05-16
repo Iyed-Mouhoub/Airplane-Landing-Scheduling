@@ -1,18 +1,15 @@
-# metaheuristics.py
-
 import random
 import numpy as np
 from typing import List, Tuple
-from src.landing_scheduler import compute_penalty, check_separation
+from src.landing_scheduler import compute_penalty, repair_schedule
+
 
 class SimulatedAnnealing:
     def __init__(self, data, T0=1000, alpha=0.98, iter_per_temp=100):
         self.data = data
-        self.T = T0
+        self.T0 = T0
         self.alpha = alpha
         self.iter_per_temp = iter_per_temp
-        self.best_order = None
-        self.best_penalty = float('inf')
 
     def _initial_solution(self) -> List[int]:
         return list(range(len(self.data['earliest'])))
@@ -23,30 +20,37 @@ class SimulatedAnnealing:
         new_order[i], new_order[j] = new_order[j], new_order[i]
         return new_order
 
-    def _decode_times(self, order: List[int]) -> np.ndarray:
-        return np.array([self.data['target'][i] for i in order])
-
     def run(self) -> Tuple[List[int], float]:
+        sep = 4.0
+        # initial solution
         order = self._initial_solution()
-        times = self._decode_times(order)
-        current_penalty = compute_penalty(times, **self.data)
-        self.best_order, self.best_penalty = order, current_penalty
+        _, times = repair_schedule(order,
+                                   self.data['earliest'],
+                                   self.data['target'],
+                                   separation=sep)
+        current_pen = compute_penalty(times, **self.data)
+        best_order, best_pen = order.copy(), current_pen
+        T = self.T0
 
-        while self.T > 1:
+        while T > 1e-3:
             for _ in range(self.iter_per_temp):
                 candidate = self._neighbor(order)
-                times_c = self._decode_times(candidate)
-                if not check_separation(candidate, times_c):
-                    continue
+                # repair then score
+                _, times_c = repair_schedule(candidate,
+                                             self.data['earliest'],
+                                             self.data['target'],
+                                             separation=sep)
                 p = compute_penalty(times_c, **self.data)
-                delta = p - current_penalty
-                if delta < 0 or random.random() < np.exp(-delta / self.T):
-                    order, current_penalty = candidate, p
-                    if p < self.best_penalty:
-                        self.best_order, self.best_penalty = candidate, p
-            self.T *= self.alpha
+                # accept criterion
+                if p < current_pen or random.random() < np.exp((current_pen - p) / T):
+                    order = candidate
+                    current_pen = p
+                    if p < best_pen:
+                        best_pen = p
+                        best_order = candidate.copy()
+            T *= self.alpha
 
-        return self.best_order, self.best_penalty
+        return best_order, best_pen
 
 
 class GeneticAlgorithm:
@@ -80,27 +84,31 @@ class GeneticAlgorithm:
             individual[i], individual[j] = individual[j], individual[i]
 
     def run(self) -> Tuple[List[int], float]:
+        sep = 4.0
         pop = self._init_pop()
-        best, best_p = None, float('inf')
+        best_order, best_pen = None, float('inf')
 
         for _ in range(self.generations):
             scored = []
             for ind in pop:
-                times = np.array([self.data['target'][i] for i in ind])
-                score = (float('inf') if not check_separation(ind, times)
-                         else compute_penalty(times, **self.data))
+                # repair then score
+                _, times = repair_schedule(ind,
+                                           self.data['earliest'],
+                                           self.data['target'],
+                                           separation=sep)
+                score = compute_penalty(times, **self.data)
                 scored.append((ind, score))
-                if score < best_p:
-                    best, best_p = ind.copy(), score
+                if score < best_pen:
+                    best_order, best_pen = ind.copy(), score
 
-            # Tournament selection
+            # tournament selection
             new_pop = []
             for _ in range(self.pop_size):
                 a, b = random.sample(scored, 2)
                 winner = a if a[1] < b[1] else b
                 new_pop.append(winner[0].copy())
 
-            # Crossover & mutation
+            # crossover & mutation
             pop = []
             for i in range(0, self.pop_size, 2):
                 p1, p2 = new_pop[i], new_pop[i+1]
@@ -113,7 +121,7 @@ class GeneticAlgorithm:
                 self._mutate(c2)
                 pop.extend([c1, c2])
 
-        return best, best_p
+        return best_order, best_pen
 
 
 class VariableNeighborhoodSearch:
@@ -121,9 +129,6 @@ class VariableNeighborhoodSearch:
         self.data = data
         self.max_iter = max_iter
         self.neighborhoods = [self._swap, self._insert, self._two_opt]
-
-    def _decode_times(self, order: List[int]) -> np.ndarray:
-        return np.array([self.data['target'][i] for i in order])
 
     def _swap(self, order: List[int]) -> List[int]:
         i, j = random.sample(range(len(order)), 2)
@@ -142,23 +147,29 @@ class VariableNeighborhoodSearch:
         return order
 
     def run(self) -> Tuple[List[int], float]:
+        sep = 4.0
         current = list(range(len(self.data['earliest'])))
-        best = current.copy()
-        best_p = compute_penalty(self._decode_times(best), **self.data)
+        # repair initial and score
+        _, times = repair_schedule(current,
+                                   self.data['earliest'],
+                                   self.data['target'],
+                                   separation=sep)
+        best, best_pen = current.copy(), compute_penalty(times, **self.data)
         it = 0
 
         while it < self.max_iter:
             for neigh in self.neighborhoods:
                 candidate = neigh(current.copy())
-                times_c = self._decode_times(candidate)
-                if not check_separation(candidate, times_c):
-                    continue
+                # repair then score
+                _, times_c = repair_schedule(candidate,
+                                             self.data['earliest'],
+                                             self.data['target'],
+                                             separation=sep)
                 p = compute_penalty(times_c, **self.data)
-                if p < best_p:
-                    best, best_p = candidate.copy(), p
+                if p < best_pen:
+                    best, best_pen = candidate.copy(), p
                     current = candidate.copy()
                     break
             it += 1
 
-        return best, best_p
-    
+        return best, best_pen
